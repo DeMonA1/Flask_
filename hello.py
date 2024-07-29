@@ -1,14 +1,22 @@
 from flask import Flask, render_template
 from flask_bootstrap import Bootstrap
 from flask_moment import Moment
+from datetime import datetime
+from flask_wtf import Form
+from wtforms import StringField, SubmitField
+from wtforms.validators import DataRequired
 
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'hard to guess string'
 bootstrap = Bootstrap(app)
+moment = Moment(app)
 
-@app.route('/index')
+
+@app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', 
+                           current_time=datetime.utcnow())
 
 @app.route('/user/<name>')
 def user(name):
