@@ -25,6 +25,12 @@ class NameForm(FlaskForm):
     submit = SubmitField('Submit')
 
 
+class Role(db.Model):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form: NameForm = NameForm()
