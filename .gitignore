@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#SQL
+*.sqlite
+
 # C extensions
 *.so
 
@@ -122,6 +125,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+my_env/
 .env
 .venv
 env/
