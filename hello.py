@@ -9,6 +9,7 @@ from wtforms.validators import InputRequired
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from flask_migrate import Migrate
 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -26,6 +27,7 @@ db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 bootstrap = Bootstrap(app)
 moment = Moment(app)
+migrate = Migrate(app, db)
 
 class NameForm(FlaskForm):
     name = StringField('What is yout name?', validators=[InputRequired()])
