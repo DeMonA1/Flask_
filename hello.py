@@ -54,6 +54,11 @@ class User(db.Model):
 with app.app_context():
     db.create_all()
 
+@app.shell_context_processor
+def make_shell_context():
+    return dict(app=app, db=db, User=User, Role=Role)
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form: NameForm = NameForm()
