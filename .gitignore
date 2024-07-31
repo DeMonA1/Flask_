@@ -10,6 +10,12 @@ __pycache__/
 # C extensions
 *.so
 
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+tmp/
+
 # Distribution / packaging
 .Python
 build/
