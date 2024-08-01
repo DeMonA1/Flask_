@@ -12,9 +12,9 @@ from . import db, login_manager
 class Permission:
     FOLLOW = 0x01
     COMMENT = 0x02
-    WRITE_ARTICLES = 0x04
-    MODERATE_COMMENTS = 0x08
-    ADMINISTER = 0x80
+    WRITE = 0x04
+    MODERATE = 0x08
+    ADMIN = 0x80
 
 
 class Role(db.Model):
@@ -25,26 +25,45 @@ class Role(db.Model):
     permissions: Mapped[int]
     users = db.relationship('User', backref='role', lazy = 'dynamic')
 
+    def __init__(self, **kwargs) -> None:
+        super(Role, self).__init__(**kwargs)
+        if self.permissions is None:
+            self.permissions = 0
+    
     @staticmethod
     def insert_roles():
         roles = {
-            'User': (Permission.FOLLOW |
-                     Permission.COMMENT |
-                     Permission.WRITE_ARTICLES, True),
-            'Moderator': (Permission.FOLLOW |
-                          Permission.COMMENT |
-                          Permission.WRITE_ARTICLES |
-                          Permission.MODERATE_COMMENTS, False),
-            'Administrator': (0xff, False)
+            'User': [Permission.FOLLOW, Permission.COMMENT, Permission.WRITE],
+            'Moderator': [Permission.FOLLOW, Permission.COMMENT, 
+                          Permission.WRITE, Permission.MODERATE],
+            'Administrator': [Permission.FOLLOW, Permission.COMMENT, 
+                          Permission.WRITE, Permission.MODERATE, Permission.ADMIN],
         }
+        default_role = 'User'
         for r in roles:
             role = Role.query.filter_by(name=r).first()
             if role is None:
                 role = Role(name=r)
-            role.permissions = roles[r][0]
-            role.default = roles[r][1]
+            role.reset_permissions()
+            for perm in roles[r]:
+                role.add_permission(perm)
+            role.default = (role.name == default_role)
             db.session.add(role)
         db.session.commit()
+    
+    def add_permission(self, perm):
+        if not self.has_permission(perm):
+            self.permissions += perm
+        
+    def remove_permission(self, perm):
+        if self.has_permission(perm):
+            self.permissions -= perm
+        
+    def reset_permissions(self):
+        self.permissions = 0
+    
+    def has_permission(self, perm):
+        return self.permissions & perm == perm
     
     def __repr__(self) -> str:
         return '<Role %r>' % self.name
@@ -58,6 +77,11 @@ class User(UserMixin, db.Model):
     role_id: Mapped[int] = mapped_column(ForeignKey('roles.id'))
     password_hash: Mapped[str]
     confirmed: Mapped[bool] = mapped_column(default=False, index=True, nullable=True)
+    name: Mapped[str] = mapped_column(nullable=True)
+    location: Mapped[str] = mapped_column(nullable=True)
+    about_me: Mapped[str] = mapped_column(nullable=True)
+    member_since: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=True)
+    last_seen: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=True)
     
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
@@ -99,13 +123,13 @@ class User(UserMixin, db.Model):
         return s.dumps({'reset': self.id}).encode('utf-8')
     
     @staticmethod
-    def reset_password(token, new_password):
+    def reset_password(token: bytes, new_password):
         s = Serializer(app.config['SECRET_KEY'])
         try:
-            data = s.loads(token.decode('utf-8'))
+            data: Dict = s.loads(token.decode('utf-8'))
         except:
             return False
-        user = User.query.get(data.get('reset'))
+        user: User = User.query.get(data.get('reset'))
         if user is None:
             return False
         user.password = new_password
@@ -116,10 +140,10 @@ class User(UserMixin, db.Model):
         s = Serializer(app.config['SECRET_KEY'])
         return s.dumps({'change_email': self.id, 'new_email': new_email}).encode('utf-8')
         
-    def change_email(self, token):
+    def change_email(self, token: bytes):
         s = Serializer(app.config['SECRET_KEY'])
         try:
-            data = s.loads(token.decode('utf-8'))
+            data: Dict = s.loads(token.decode('utf-8'))
         except:
             return False
         if data.get('change_email') != self.id:
@@ -138,9 +162,12 @@ class User(UserMixin, db.Model):
             (self.role.permissions & permissions) == permissions
             
     def is_administrator(self):
-        return self.can(Permission.ADMINISTER)
+        return self.can(Permission.ADMIN)
      
-    
+    def ping(self):
+        self.last_seen = datetime.utcnow()
+        db.session.add(self)
+        
     def __repr__(self) -> str:
         return '<User %r>' % self.username
 
