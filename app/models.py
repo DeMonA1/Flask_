@@ -2,24 +2,55 @@ from datetime import datetime
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import ForeignKey
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import UserMixin
+from flask_login import UserMixin, AnonymousUserMixin
 from flask import current_app as app
 from itsdangerous import URLSafeTimedSerializer as Serializer
 from typing import Dict
 from . import db, login_manager
 
 
+class Permission:
+    FOLLOW = 0x01
+    COMMENT = 0x02
+    WRITE_ARTICLES = 0x04
+    MODERATE_COMMENTS = 0x08
+    ADMINISTER = 0x80
+
+
 class Role(db.Model):
     __tablename__ = 'roles'
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(unique=True)
+    default: Mapped[bool] = mapped_column(default=False, index=True, nullable=True)
+    permissions: Mapped[int]
     users = db.relationship('User', backref='role', lazy = 'dynamic')
 
+    @staticmethod
+    def insert_roles():
+        roles = {
+            'User': (Permission.FOLLOW |
+                     Permission.COMMENT |
+                     Permission.WRITE_ARTICLES, True),
+            'Moderator': (Permission.FOLLOW |
+                          Permission.COMMENT |
+                          Permission.WRITE_ARTICLES |
+                          Permission.MODERATE_COMMENTS, False),
+            'Administrator': (0xff, False)
+        }
+        for r in roles:
+            role = Role.query.filter_by(name=r).first()
+            if role is None:
+                role = Role(name=r)
+            role.permissions = roles[r][0]
+            role.default = roles[r][1]
+            db.session.add(role)
+        db.session.commit()
+    
     def __repr__(self) -> str:
         return '<Role %r>' % self.name
 
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(unique=True, index=True)
@@ -27,6 +58,14 @@ class User(db.Model):
     role_id: Mapped[int] = mapped_column(ForeignKey('roles.id'))
     password_hash: Mapped[str]
     confirmed: Mapped[bool] = mapped_column(default=False, index=True, nullable=True)
+    
+    def __init__(self, **kwargs):
+        super(User, self).__init__(**kwargs)
+        if self.role is None:
+            if self.email == app.config['FLASKY_ADMIN']:
+                self.role = Role.query.filter_by(permissions=0xff).first()
+            if self.role is None:
+                self.role = Role.query.filter_by(default=True).first()
     
     @property
     def password(self):
@@ -94,11 +133,28 @@ class User(db.Model):
         db.session.add(self)
         return True
     
+    def can(self, permissions):
+        return self.role is not None and \
+            (self.role.permissions & permissions) == permissions
+            
+    def is_administrator(self):
+        return self.can(Permission.ADMINISTER)
+     
     
     def __repr__(self) -> str:
         return '<User %r>' % self.username
 
+
+class AnonymousUser(AnonymousUserMixin):
+    def can(self, permissions):
+        return False
     
+    def is_administrator(self):
+        return False
+
+
+login_manager.anonymous_user = AnonymousUser
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
