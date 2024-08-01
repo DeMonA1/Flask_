@@ -8,7 +8,7 @@ from ..models import User, Role
 
 @main.route('/', methods=['GET', 'POST'])
 def index():
-    form = NameForm()
+    form: NameForm = NameForm()
     if form.validate_on_submit():
         # ...
         return redirect(url_for('.index'))
