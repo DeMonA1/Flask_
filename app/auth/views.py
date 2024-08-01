@@ -10,9 +10,11 @@ from ..email import send_email
 
 @auth.before_app_request
 def before_request():
-    if current_user.is_authenticated and not current_user.confirmed \
-        and request.endpoint[:5] != 'auth.':
-        return redirect(url_for('auth.unconfirmed'))
+    if current_user.is_authenticated:
+        current_user.ping()
+        if not current_user.confirmed and request.endpoint \
+        and request.blueprint != 'auth' and request.endpoint != 'static':
+            return redirect(url_for('auth.unconfirmed'))
 
 
 @auth.route('/login', methods=['GET', 'POST'])
@@ -43,7 +45,7 @@ def register():
     form: RegistrationForm = RegistrationForm()
     if form.validate_on_submit():
         user = User(email=form.email.data.lower(), username=form.username.data,
-                    password=form.password.data, role_id=3)
+                    password=form.password.data)
         db.session.add(user)
         db.session.commit()
         token = user.generate_confirmation_token()
@@ -106,7 +108,7 @@ def password_reset_request():
         return redirect(url_for('main.index'))
     form: PasswordResetRequestForm = PasswordResetRequestForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data.lower()).first()
+        user: User = User.query.filter_by(email=form.email.data.lower()).first()
         if user:
             token = user.generate_reset_token()
             send_email(user.email, 'Reset Your Password',
