@@ -8,6 +8,7 @@ class UserModelTestCase(unittest.TestCase):
         self.app_context = self.app.app_context()
         self.app_context.push()
         db.create_all()
+        Role.insert_roles()
         
     
     def tearDown(self):
@@ -35,15 +36,15 @@ class UserModelTestCase(unittest.TestCase):
         self.assertTrue(u.password_hash != u2.password_hash)
         
     def test_valid_confirmation_token(self):
-        u = User(password='cat', email='asad', username='dassdada', role_id=3)
+        u = User(password='cat', email='asad', username='dassdada')
         db.session.add(u)
         db.session.commit()
         token = u.generate_confirmation_token()
         self.assertTrue(u.confirm(token))
         
     def test_invalid_confirmation_token(self):
-        u1 = User(password='cat', email='asad', username='dassdada', role_id=3)
-        u2 = User(password='dog', email='asd', username='dsdada', role_id=3)
+        u1 = User(password='cat', email='asad1', username='dassdada')
+        u2 = User(password='dog', email='asd', username='dsdada')
         db.session.add(u1)
         db.session.add(u2)
         db.session.commit()
@@ -51,7 +52,7 @@ class UserModelTestCase(unittest.TestCase):
         self.assertFalse(u2.confirm(token))
         
     def test_valid_reset_token(self):
-        u = User(password='cat', email='asad', username='dassdada', role_id=3)
+        u = User(password='cat', email='asad2', username='dassdada')
         db.session.add(u)
         db.session.commit()
         token = u.generate_reset_token()
@@ -59,7 +60,7 @@ class UserModelTestCase(unittest.TestCase):
         self.assertTrue(u.verify_password('dog'))
         
     def test_invalid_reset_token(self):
-        u = User(password='cat', email='asad', username='dassdada', role_id=3)
+        u = User(password='cat', email='asad3', username='dassdada')
         db.session.add(u)
         db.session.commit()
         token = u.generate_reset_token()
@@ -67,7 +68,7 @@ class UserModelTestCase(unittest.TestCase):
         self.assertTrue(u.verify_password('cat'))
         
     def test_valid_email_change_token(self):
-        u = User(email='jo@example.com', password='cat', username='dassdada', role_id=3)
+        u = User(email='jo@example.com', password='cat', username='dassdada')
         db.session.add(u)
         db.session.commit()
         token = u.generate_email_change_token('san@example.org')
@@ -75,8 +76,8 @@ class UserModelTestCase(unittest.TestCase):
         self.assertTrue(u.email == 'san@example.org')
         
     def test_invalid_email_change_token(self):
-        u1 = User(email='john@example.com', password='cat', username='dassada', role_id=3)
-        u2 = User(email='susan@example.org', password='dog', username='dasada', role_id=3)
+        u1 = User(email='john@example.com', password='cat', username='dassada')
+        u2 = User(email='susan@example.org', password='dog', username='dasada')
         db.session.add(u1)
         db.session.add(u2)
         db.session.commit()
@@ -85,8 +86,8 @@ class UserModelTestCase(unittest.TestCase):
         self.assertTrue(u2.email == 'susan@example.org')
         
     def test_duplicate_email_change_token(self):
-        u1 = User(email='john@example.com', password='cat', username='dasdada', role_id=3)
-        u2 = User(email='susan@example.org', password='dog', username='dada', role_id=3)
+        u1 = User(email='john@example.com', password='cat', username='dasdada')
+        u2 = User(email='susan@example.org', password='dog', username='dada')
         db.session.add(u1)
         db.session.add(u2)
         db.session.commit()
@@ -96,7 +97,7 @@ class UserModelTestCase(unittest.TestCase):
         
     def test_roles_and_permissions(self):
         Role.insert_roles()
-        u = User(email='john@example.com', password='cat')
+        u = User(email='john@example.com', password='cat', username='dada')
         self.assertTrue(u.can(Permission.WRITE_ARTICLES))
         self.assertFalse(u.can(Permission.MODERATE_COMMENTS))
         
