@@ -6,6 +6,8 @@ __pycache__/
 # SQLite databases
 *.sqlite
 
+#vscode
+.vscode/
 
 # C extensions
 *.so

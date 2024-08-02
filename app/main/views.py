@@ -2,31 +2,39 @@ from datetime import datetime
 from flask import render_template, session, redirect, url_for, abort, flash, request,\
     current_app as app, make_response
 from flask_login import login_required, current_user
+from flask_sqlalchemy.pagination import Pagination
 from . import main
-from .forms import NameForm, EditProfileForm, EditProfileAdminForm
+from .forms import NameForm, EditProfileForm, EditProfileAdminForm, PostForm
 from .. import db
-from ..models import User, Role, Permission
+from ..models import User, Role, Permission, Post
 from ..decorators import admin_required, permission_required
 
 
 @main.route('/', methods=['GET', 'POST'])
 def index():
-    form: NameForm = NameForm()
-    if form.validate_on_submit():
-        # ...
+    form: PostForm = PostForm()
+    if current_user.can(Permission.WRITE) and \
+        form.validate_on_submit():
+        post = Post(body=form.body.data, author=current_user._get_current_object()) 
+        db.session.add(post)
+        db.session.commit()
         return redirect(url_for('.index'))
-    return render_template('index.html',
-                           form=form, name=session.get('name'),
-                           known=session.get('known', False),
-                           current_time=datetime.utcnow())
-    
+    page = request.args.get('page', 1, type=int)
+    pagination: Pagination = Post.query.order_by(Post.timestamp.desc()).paginate(
+        page, per_page=app.config['FLASKY_POSTS_PER_PAGE'],
+        error_out=False)
+    posts = pagination.items
+    return render_template('index.html', form=form, posts=posts,
+                           pagination=pagination)
+
 
 @main.route('/user/<username>')
 def user(username):
-    user = User.query.filter_by(username=username).first()
+    user = User.query.filter_by(username=username).first_or_404()
     if user is None:
         abort(404)
-    return render_template('user.html', user=user)
+    posts = user.posts.order_by(Post.timestamp.desc()).all()
+    return render_template('user.html', user=user, posts=posts)
 
 
 @main.route('/edit-profile', methods=['GET', 'POST'])

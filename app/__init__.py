@@ -4,12 +4,16 @@ from flask_mail import Mail
 from flask_moment import Moment
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
+from flask_pagedown import PageDown
 from sqlalchemy.orm import DeclarativeBase
 from config import config
 
 
 class Base(DeclarativeBase):
     pass
+
+
+pagedown = PageDown()
 
 
 bootstrap = Bootstrap()
@@ -31,6 +35,7 @@ def create_app(config_name):
     moment.init_app(app)
     db.init_app(app)
     login_manager.init_app(app)
+    pagedown.init_app(app)
     
     with app.app_context():
         db.create_all()
