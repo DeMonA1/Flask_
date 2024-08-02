@@ -1,9 +1,10 @@
 from datetime import datetime
+import hashlib
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import ForeignKey
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin, AnonymousUserMixin
-from flask import current_app as app
+from flask import current_app as app, request
 from itsdangerous import URLSafeTimedSerializer as Serializer
 from typing import Dict
 from . import db, login_manager
@@ -82,6 +83,7 @@ class User(UserMixin, db.Model):
     about_me: Mapped[str] = mapped_column(nullable=True)
     member_since: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=True)
     last_seen: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=True)
+    avatar_hash: Mapped[str] = mapped_column(nullable=True)
     
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
@@ -90,6 +92,11 @@ class User(UserMixin, db.Model):
                 self.role = Role.query.filter_by(permissions=0xff).first()
             if self.role is None:
                 self.role = Role.query.filter_by(default=True).first()
+        if self.email is not None and self.avatar_hash is None:
+            self.avatar_hash = self.gravatar_hash() 
+            
+    def __repr__(self) -> str:
+        return '<User %r>' % self.username
     
     @property
     def password(self):
@@ -154,6 +161,7 @@ class User(UserMixin, db.Model):
         if self.query.filter_by(email=new_email).first() is not None:
             return False
         self.email = new_email
+        self.avatar_hash = self.gravatar_hash()
         db.session.add(self)
         return True
     
@@ -167,9 +175,15 @@ class User(UserMixin, db.Model):
     def ping(self):
         self.last_seen = datetime.utcnow()
         db.session.add(self)
-        
-    def __repr__(self) -> str:
-        return '<User %r>' % self.username
+    
+    def gravatar_hash(self):
+        return hashlib.md5(self.email.lower().encode('utf-8')).hexdigest()
+    
+    def gravatar(self, size=100, default='identicon', rating='g'):
+        url = 'https://secure.gravatar.com/avatar'  
+        hash = self.avatar_hash or self.gravatar_hash()
+        return f'{url}/{hash}?s={size}&d={default}&r={rating}'
+
 
 
 class AnonymousUser(AnonymousUserMixin):
