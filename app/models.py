@@ -7,6 +7,8 @@ from flask_login import UserMixin, AnonymousUserMixin
 from flask import current_app as app, request
 from itsdangerous import URLSafeTimedSerializer as Serializer
 from typing import Dict
+from markdown import markdown
+import bleach
 from . import db, login_manager
 
 
@@ -186,7 +188,6 @@ class User(UserMixin, db.Model):
         return f'{url}/{hash}?s={size}&d={default}&r={rating}'
 
 
-
 class AnonymousUser(AnonymousUserMixin):
     def can(self, permissions):
         return False
@@ -207,5 +208,17 @@ class Post(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     body: Mapped[str]
     timestamp: Mapped[datetime] = mapped_column(index=True, default=datetime.utcnow)
-    author_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
+    author_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    body_html: Mapped[str]
     
+    @staticmethod
+    def on_changed_body(target: Post, value, oldvalue, initiator):
+        allowed_tags = ['a', 'abbr', 'acronym', 'b', 'blockquote', 'code',
+                        'em', 'i', 'li', 'ol', 'pre', 'strong', 'ul',
+                        'h1', 'h2', 'h3', 'p']
+        target.body_html = bleach.linkify(bleach.clean(
+            markdown(value, output_format='html'),
+            tags=allowed_tags, strip=True))
+
+
+db.event.listen(Post.body, 'set', Post.on_changed_body)     # events handler
