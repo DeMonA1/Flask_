@@ -1,6 +1,7 @@
+from __future__ import annotations
 from datetime import datetime
 import hashlib
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, backref, Query
 from sqlalchemy import ForeignKey
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin, AnonymousUserMixin
@@ -26,7 +27,7 @@ class Role(db.Model):
     name: Mapped[str] = mapped_column(unique=True)
     default: Mapped[bool] = mapped_column(default=False, index=True, nullable=True)
     permissions: Mapped[int]
-    users = db.relationship('User', backref='role', lazy = 'dynamic')
+    users: Query = db.relationship('User', backref='role', lazy = 'dynamic')
 
     def __init__(self, **kwargs) -> None:
         super(Role, self).__init__(**kwargs)
@@ -72,6 +73,13 @@ class Role(db.Model):
         return '<Role %r>' % self.name
 
 
+class Follow(db.Model):
+    __tablename__ = 'follows'
+    follower_id: Mapped[int] = mapped_column(ForeignKey('users.id'), primary_key=True)
+    followed_id: Mapped[int] = mapped_column(ForeignKey('users.id'), primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -87,6 +95,16 @@ class User(UserMixin, db.Model):
     last_seen: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=True)
     avatar_hash: Mapped[str] = mapped_column(nullable=True)
     posts = db.relationship('Post', backref='author', lazy='dynamic')
+    followed: Query = db.relationship('Follow',
+                               foreign_keys=[Follow.follower_id],
+                               backref= backref('follower', lazy='joined'),
+                               lazy='dynamic',
+                               cascade='all, delete-orphan')
+    followers: Query = db.relationship('Follow',
+                                foreign_keys=[Follow.followed_id],
+                                backref=backref('followed', lazy='joined'),
+                                lazy='dynamic',
+                                cascade='all, delete-orphan')
     
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
@@ -187,7 +205,23 @@ class User(UserMixin, db.Model):
         hash = self.avatar_hash or self.gravatar_hash()
         return f'{url}/{hash}?s={size}&d={default}&r={rating}'
 
+    def follow(self, user):
+        if not self.is_following(user):
+            f = Follow(follower=self, followed=user)
+            db.session.add(f)
+    
+    def unfollow(self, user):
+        f = self.followed.filter_by(followed_id=user.id).first()
+        if f:
+            db.session.delete(f)
+    
+    def is_following(self, user):
+        return self.followed.filter_by(followed_id=user.id).first() is not None
 
+    def is_followed_by(self, user):
+        return self.followers.filter_by(follower_id=user.id).first() is not None
+    
+    
 class AnonymousUser(AnonymousUserMixin):
     def can(self, permissions):
         return False
@@ -222,3 +256,5 @@ class Post(db.Model):
 
 
 db.event.listen(Post.body, 'set', Post.on_changed_body)     # events handler
+
+    
