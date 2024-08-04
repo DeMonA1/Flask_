@@ -1,6 +1,7 @@
+from __future__ import annotations
 from datetime import datetime
 import hashlib
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, backref
 from sqlalchemy import ForeignKey
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin, AnonymousUserMixin
@@ -13,11 +14,11 @@ from . import db, login_manager
 
 
 class Permission:
-    FOLLOW = 0x01
-    COMMENT = 0x02
-    WRITE = 0x04
-    MODERATE = 0x08
-    ADMIN = 0x80
+    FOLLOW = 1
+    COMMENT = 2
+    WRITE = 4
+    MODERATE = 8
+    ADMIN = 16
 
 
 class Role(db.Model):
@@ -72,6 +73,13 @@ class Role(db.Model):
         return '<Role %r>' % self.name
 
 
+class Follow(db.Model):
+    __tablename__ = 'follows'
+    follower_id: Mapped[int] = mapped_column(ForeignKey('users.id'), primary_key=True)
+    followed_id: Mapped[int] = mapped_column(ForeignKey('users.id'), primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -87,19 +95,44 @@ class User(UserMixin, db.Model):
     last_seen: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=True)
     avatar_hash: Mapped[str] = mapped_column(nullable=True)
     posts = db.relationship('Post', backref='author', lazy='dynamic')
+    followed = db.relationship('Follow',
+                               foreign_keys=[Follow.follower_id],
+                               backref= backref('follower', lazy='joined'),
+                               lazy='dynamic',
+                               cascade='all, delete-orphan')
+    followers = db.relationship('Follow',
+                                foreign_keys=[Follow.followed_id],
+                                backref=backref('followed', lazy='joined'),
+                                lazy='dynamic',
+                                cascade='all, delete-orphan')
+    
     
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
         if self.role is None:
             if self.email == app.config['FLASKY_ADMIN']:
-                self.role = Role.query.filter_by(permissions=0xff).first()
+                self.role = Role.query.filter_by(name='Administrator').first()
             if self.role is None:
                 self.role = Role.query.filter_by(default=True).first()
         if self.email is not None and self.avatar_hash is None:
             self.avatar_hash = self.gravatar_hash() 
+        self.follow(self)
             
     def __repr__(self) -> str:
         return '<User %r>' % self.username
+    
+    @staticmethod
+    def add_self_follows():
+        for user in User.query.all():
+            if not user.is_following(user):
+                user.follow(user)
+                db.session.add(user)
+                db.session.commit()
+    
+    @property
+    def followed_posts(self):
+        return Post.query.join(Follow, Follow.followed_id == Post.author_id) \
+            .filter(Follow.follower_id == self.id)
     
     @property
     def password(self):
@@ -168,9 +201,8 @@ class User(UserMixin, db.Model):
         db.session.add(self)
         return True
     
-    def can(self, permissions):
-        return self.role is not None and \
-            (self.role.permissions & permissions) == permissions
+    def can(self, perm):
+        return self.role is not None and self.role.has_permission(perm)
             
     def is_administrator(self):
         return self.can(Permission.ADMIN)
@@ -187,7 +219,27 @@ class User(UserMixin, db.Model):
         hash = self.avatar_hash or self.gravatar_hash()
         return f'{url}/{hash}?s={size}&d={default}&r={rating}'
 
+    def follow(self, user):
+        if not self.is_following(user):
+            f = Follow(follower=self, followed=user)
+            db.session.add(f)
+    
+    def unfollow(self, user):
+        f = self.followed.filter_by(followed_id=user.id).first()
+        if f:
+            db.session.delete(f)
+    
+    def is_following(self, user):
+        if user.id is None:
+            return False
+        return self.followed.filter_by(followed_id=user.id).first() is not None
 
+    def is_followed_by(self, user):
+        if user.id is None:
+            return False
+        return self.followers.filter_by(follower_id=user.id).first() is not None
+    
+    
 class AnonymousUser(AnonymousUserMixin):
     def can(self, permissions):
         return False
@@ -222,3 +274,5 @@ class Post(db.Model):
 
 
 db.event.listen(Post.body, 'set', Post.on_changed_body)     # events handler
+
+    
