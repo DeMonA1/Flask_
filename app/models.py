@@ -87,7 +87,7 @@ class User(UserMixin, db.Model):
     username: Mapped[str] = mapped_column(unique=True, index=True)
     role_id: Mapped[int] = mapped_column(ForeignKey('roles.id'))
     password_hash: Mapped[str]
-    confirmed: Mapped[bool] = mapped_column(default=False, index=True, nullable=True)
+    confirmed: Mapped[bool] = mapped_column(default=False, nullable=True)
     name: Mapped[str] = mapped_column(nullable=True)
     location: Mapped[str] = mapped_column(nullable=True)
     about_me: Mapped[str] = mapped_column(nullable=True)
@@ -129,17 +129,7 @@ class User(UserMixin, db.Model):
                 user.follow(user)
                 db.session.add(user)
                 db.session.commit()
-    
-    @staticmethod
-    def verify_auth_token(token):
-        s = Serializer(app.config['SECRET_KEY'])
-        try:
-            data = s.loads(token)
-        except:
-            return None
-        return User.query.get(data['id'])
 
-    
     @property
     def followed_posts(self):
         return Post.query.join(Follow, Follow.followed_id == Post.author_id) \
@@ -252,7 +242,16 @@ class User(UserMixin, db.Model):
     
     def generate_auth_token(self):
         s = Serializer(app.config['SECRET_KEY'])
-        return s.dumps({'id': self.id})
+        return s.dumps({'id': self.id}).encode('utf-8')
+    
+    @staticmethod
+    def verify_auth_token(token: bytes):
+        s = Serializer(app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token.decode('utf-8'))
+        except:
+            return None
+        return User.query.get(data['id'])
     
     def to_json(self):
         json_user = {
@@ -337,5 +336,23 @@ class Comment(db.Model):
         target.body_html = bleach.linkify(bleach.clean(
             markdown(value, output_format='html'), tags=allowed_tags, strip=True))
 
+    def to_json(self):
+        json_comment = {
+            'url': url_for('api.get_comment', id=self.id),
+            'post_url': url_for('api.get_post', id=self.post_id),
+            'body': self.body,
+            'body_html': self.body_html,
+            'timestamp': self.timestamp,
+            'author_id': url_for('api.get_user', id=self.author_id),
+        }
+        return json_comment
+    
+    @staticmethod
+    def from_json(json_comment):
+        body = json_comment.get('body')
+        if body is None or body == '':
+            raise ValidationError('comment does not have a body')
+        return Comment(body=body)
+    
 
 db.event.listen(Comment.body, 'set', Comment.on_changed_body)
