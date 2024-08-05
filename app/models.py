@@ -130,6 +130,16 @@ class User(UserMixin, db.Model):
                 db.session.add(user)
                 db.session.commit()
     
+    @staticmethod
+    def verify_auth_token(token):
+        s = Serializer(app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token)
+        except:
+            return None
+        return User.query.get(data['id'])
+
+    
     @property
     def followed_posts(self):
         return Post.query.join(Follow, Follow.followed_id == Post.author_id) \
@@ -239,6 +249,11 @@ class User(UserMixin, db.Model):
         if user.id is None:
             return False
         return self.followers.filter_by(follower_id=user.id).first() is not None
+    
+    def generate_auth_token(self):
+        s = Serializer(app.config['SECRET_KEY'])
+        return s.dumps({'id': self.id})
+    
     
     
 class AnonymousUser(AnonymousUserMixin):
