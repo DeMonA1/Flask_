@@ -5,13 +5,13 @@ from sqlalchemy.orm import Mapped, mapped_column, backref
 from sqlalchemy import ForeignKey
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin, AnonymousUserMixin
-from flask import current_app as app, request
+from flask import current_app as app, url_for
 from itsdangerous import URLSafeTimedSerializer as Serializer
 from typing import Dict
 from markdown import markdown
 import bleach
 from . import db, login_manager
-
+from .exceptions import ValidationError
 
 class Permission:
     FOLLOW = 1
@@ -254,7 +254,17 @@ class User(UserMixin, db.Model):
         s = Serializer(app.config['SECRET_KEY'])
         return s.dumps({'id': self.id})
     
-    
+    def to_json(self):
+        json_user = {
+            'url': url_for('api.get_user', id=self.id, _external=True),
+            'username': self.username,
+            'member_since': self.member_since,
+            'last_seen': self.last_seen,
+            'posts': url_for('api.get_user_posts', id=self.id, _external=True),
+            'followed_posts': url_for('api.get_user_followed_posts', id=self.id, _external=True),
+            'post_count': self.posts.count()
+        }
+        return json_user
     
 class AnonymousUser(AnonymousUserMixin):
     def can(self, permissions):
@@ -289,7 +299,25 @@ class Post(db.Model):
             markdown(value, output_format='html'),
             tags=allowed_tags, strip=True))
 
-
+    @staticmethod
+    def from_json(json_post):
+        body = json_post.get('body')
+        if body is None or body == '':
+            raise ValidationError('post does not have a body')
+        return Post(body=body)
+    
+    def to_json(self):
+        json_post = {
+            'url': url_for('api.get_post', id=self.id, _external=True),
+            'body': self.body,
+            'body.html': self.body_html,
+            'timestamp': self.timestamp,
+            'author': url_for('api.get_user', id=self.author_id, _external=True),
+            'comments': url_for('api.get_post_comments', id=self.id, _external=True),
+            'comment_count': self.comments.count()
+        }
+        return json_post
+    
 db.event.listen(Post.body, 'set', Post.on_changed_body)     # events handler
 
 
