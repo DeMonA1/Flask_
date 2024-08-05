@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from app import create_app, db
 from app.models import User, Role, Permission, AnonymousUser, Follow
+from app.fake import users, posts
 
 
 class UserModelTestCase(unittest.TestCase):
@@ -14,7 +15,6 @@ class UserModelTestCase(unittest.TestCase):
             db.create_all()
         Role.insert_roles()
         
-    
     def tearDown(self):
         db.session.remove()
         db.drop_all()
