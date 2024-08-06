@@ -1,16 +1,17 @@
 from __future__ import annotations
 from datetime import datetime
 import hashlib
-from sqlalchemy.orm import Mapped, mapped_column, backref
-from sqlalchemy import ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, backref, relationship
+from sqlalchemy import ForeignKey, PrimaryKeyConstraint, Integer, DateTime, String, Boolean
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin, AnonymousUserMixin
-from flask import current_app as app, request
+from flask import current_app as app, url_for
 from itsdangerous import URLSafeTimedSerializer as Serializer
 from typing import Dict
 from markdown import markdown
 import bleach
 from . import db, login_manager
+from .exceptions import ValidationError
 
 
 class Permission:
@@ -75,26 +76,26 @@ class Role(db.Model):
 
 class Follow(db.Model):
     __tablename__ = 'follows'
-    follower_id: Mapped[int] = mapped_column(ForeignKey('users.id'), primary_key=True)
-    followed_id: Mapped[int] = mapped_column(ForeignKey('users.id'), primary_key=True)
-    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-
+    follower_id = mapped_column(Integer, ForeignKey('users.id'), primary_key=True)
+    followed_id = mapped_column(Integer, ForeignKey('users.id'), primary_key=True)
+    timestamp = mapped_column(DateTime, default=datetime.utcnow)
+    __table_args__ = (PrimaryKeyConstraint('follower_id', 'followed_id'),)
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(unique=True, index=True)
-    username: Mapped[str] = mapped_column(unique=True, index=True)
-    role_id: Mapped[int] = mapped_column(ForeignKey('roles.id'))
-    password_hash: Mapped[str]
-    confirmed: Mapped[bool] = mapped_column(default=False, index=True, nullable=True)
-    name: Mapped[str] = mapped_column(nullable=True)
-    location: Mapped[str] = mapped_column(nullable=True)
-    about_me: Mapped[str] = mapped_column(nullable=True)
-    member_since: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=True)
-    last_seen: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=True)
-    avatar_hash: Mapped[str] = mapped_column(nullable=True)
-    posts = db.relationship('Post', backref='author', lazy='dynamic')
+    id = mapped_column(Integer, primary_key=True)
+    email = mapped_column(String, unique=True, index=True)
+    username = mapped_column(String, unique=True, index=True)
+    role_id = mapped_column(Integer, ForeignKey('roles.id'))
+    password_hash = mapped_column(String)
+    confirmed = mapped_column(Boolean, default=False, nullable=True)
+    name = mapped_column(String, nullable=True)
+    location = mapped_column(String, nullable=True)
+    about_me = mapped_column(String, nullable=True)
+    member_since = mapped_column(DateTime, default=datetime.utcnow, nullable=True)
+    last_seen = mapped_column(DateTime, default=datetime.utcnow, nullable=True)
+    avatar_hash = mapped_column(String, nullable=True)
+    posts = relationship('Post', backref='author', lazy='dynamic')
     followed = db.relationship('Follow',
                                foreign_keys=[Follow.follower_id],
                                backref= backref('follower', lazy='joined'),
@@ -105,7 +106,7 @@ class User(UserMixin, db.Model):
                                 backref=backref('followed', lazy='joined'),
                                 lazy='dynamic',
                                 cascade='all, delete-orphan')
-    comments = db.relationship('Comment', backref='author', lazy='dynamic')
+    comments = relationship('Comment', backref='author', lazy='dynamic')
     
     
     def __init__(self, **kwargs):
@@ -129,7 +130,7 @@ class User(UserMixin, db.Model):
                 user.follow(user)
                 db.session.add(user)
                 db.session.commit()
-    
+
     @property
     def followed_posts(self):
         return Post.query.join(Follow, Follow.followed_id == Post.author_id) \
@@ -240,6 +241,30 @@ class User(UserMixin, db.Model):
             return False
         return self.followers.filter_by(follower_id=user.id).first() is not None
     
+    def generate_auth_token(self):
+        s = Serializer(app.config['SECRET_KEY'])
+        return s.dumps({'id': self.id}).encode('utf-8')
+    
+    @staticmethod
+    def verify_auth_token(token: bytes):
+        s = Serializer(app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token.decode('utf-8'))
+        except:
+            return None
+        return User.query.get(data['id'])
+    
+    def to_json(self):
+        json_user = {
+            'url': url_for('api.get_user', id=self.id, _external=True),
+            'username': self.username,
+            'member_since': self.member_since,
+            'last_seen': self.last_seen,
+            'posts_url': url_for('api.get_user_posts', id=self.id, _external=True),
+            'followed_posts_url': url_for('api.get_user_followed_posts', id=self.id, _external=True),
+            'post_count': self.posts.count()
+        }
+        return json_user
     
 class AnonymousUser(AnonymousUserMixin):
     def can(self, permissions):
@@ -274,7 +299,25 @@ class Post(db.Model):
             markdown(value, output_format='html'),
             tags=allowed_tags, strip=True))
 
-
+    @staticmethod
+    def from_json(json_post):
+        body = json_post.get('body')
+        if body is None or body == '':
+            raise ValidationError('post does not have a body')
+        return Post(body=body)
+    
+    def to_json(self):
+        json_post = {
+            'url': url_for('api.get_post', id=self.id, _external=True),
+            'body': self.body,
+            'body.html': self.body_html,
+            'timestamp': self.timestamp,
+            'author': url_for('api.get_user', id=self.author_id, _external=True),
+            'comments': url_for('api.get_post_comments', id=self.id, _external=True),
+            'comment_count': self.comments.count()
+        }
+        return json_post
+    
 db.event.listen(Post.body, 'set', Post.on_changed_body)     # events handler
 
 
@@ -284,7 +327,7 @@ class Comment(db.Model):
     body: Mapped[str]
     body_html: Mapped[str]
     timestamp: Mapped[datetime] = mapped_column(index=True, default=datetime.utcnow)
-    disabled: Mapped[bool]
+    disabled: Mapped[bool] = mapped_column(nullable=True, default=False)
     author_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
     post_id: Mapped[int] = mapped_column(ForeignKey('posts.id'))
     
@@ -294,5 +337,23 @@ class Comment(db.Model):
         target.body_html = bleach.linkify(bleach.clean(
             markdown(value, output_format='html'), tags=allowed_tags, strip=True))
 
+    def to_json(self):
+        json_comment = {
+            'url': url_for('api.get_comment', id=self.id),
+            'post_url': url_for('api.get_post', id=self.post_id),
+            'body': self.body,
+            'body_html': self.body_html,
+            'timestamp': self.timestamp,
+            'author_id': url_for('api.get_user', id=self.author_id),
+        }
+        return json_comment
+    
+    @staticmethod
+    def from_json(json_comment):
+        body = json_comment.get('body')
+        if body is None or body == '':
+            raise ValidationError('comment does not have a body')
+        return Comment(body=body)
+    
 
 db.event.listen(Comment.body, 'set', Comment.on_changed_body)

@@ -10,7 +10,7 @@ def users(count=100):
     i = 0
     while i < count:
         u = User(email=fake.email(),
-                 uername=fake.user_name(),
+                 username=fake.user_name(),
                  password='password',
                  confirmed=True,
                  name=fake.name(),

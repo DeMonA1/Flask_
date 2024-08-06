@@ -5,7 +5,7 @@ from .. import db
 from ..models import User
 from .forms import LoginForm, RegistrationForm, ChangePasswordForm, ChangeEmailForm, \
     PasswordResetRequestForm, PasswordResetForm
-from ..email import send_email
+from .._email import send_email
 
 
 @auth.before_app_request
