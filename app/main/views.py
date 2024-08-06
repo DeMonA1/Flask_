@@ -146,7 +146,7 @@ def follow(username):
     return redirect(url_for('.user', username=username))
 
 
-@main.route('/follow/<username>')
+@main.route('/unfollow/<username>')
 @login_required
 @permission_required(Permission.FOLLOW)
 def unfollow(username):
@@ -171,7 +171,7 @@ def followers(username):
         return redirect(url_for('.index'))
     page = request.args.get('page', 1, type=int)
     pagination: Pagination = user.followers.paginate(
-        page=page, per_page=app.config['FLSKY_FOLLOWERS_PER_PAGE'], error_out=False)
+        page=page, per_page=app.config['FLASKY_FOLLOWERS_PER_PAGE'], error_out=False)
     follows = [{'user': item.follower, 'timestamp': item.timestamp}
                for item in pagination.items]
     return render_template('followers.html', user=user, title='Followers of',
@@ -186,7 +186,7 @@ def followed_by(username):
         return redirect(url_for('.index'))
     page = request.args.get('page', 1, type=int)
     pagination: Pagination = user.followed.paginate(
-        page=page, per_page=app.config['FLSKY_FOLLOWERS_PER_PAGE'], error_out=False)
+        page=page, per_page=app.config['FLASKY_FOLLOWERS_PER_PAGE'], error_out=False)
     follows = [{'user': item.followed, 'timestamp': item.timestamp}
                for item in pagination.items]
     return render_template('followers.html', user=user, title='Followed of',
