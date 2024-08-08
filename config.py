@@ -49,9 +49,18 @@ class ProductionConfig(Config):
         'sqlite:///' + os.path.join(basedir, 'data.sqlite')
         
 
+class TestingWithSeleniumConfig(TestingConfig):
+    @staticmethod
+    def init_app(app):
+        if os.environ.get('FLASK_RUN_FROM_CLI'):
+            os.environ.pop('FLASK_RUN_FROM_CLI')
+
+        
+        
 config: Dict[str, Type[T]] = {
     'development': DevelopmentConfig,
     'testing': TestingConfig,
     'production': ProductionConfig,
-    'default': DevelopmentConfig
+    'default': DevelopmentConfig,
+    'testing-with-selenium': TestingWithSeleniumConfig,
 }

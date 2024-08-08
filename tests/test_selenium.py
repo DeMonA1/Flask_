@@ -43,8 +43,8 @@ class SeleniumTestCase(unittest.TestCase):
             
             # add an administrator user
             admin_role = Role.query.filter_by(name='Administrator').first()
-            admin = User(email='h59@example.com',
-                         username='h59', password='cat',
+            admin = User(email='h66@e.com',
+                         username='she', password='123444',
                          role=admin_role, confirmed=True)
             db.session.add(admin)
             db.session.commit()
@@ -85,7 +85,7 @@ class SeleniumTestCase(unittest.TestCase):
     def test_admin_home_page(self):
         # navigate to home page
         self.client.get(f'http://{self.HOST}:{self.PORT}/')
-        self.assertTrue(re.search('Hello Stranger!',
+        self.assertTrue(re.search('Hello, Stranger!',
                                   self.client.page_source))
         
         # navigate to login page
@@ -93,11 +93,12 @@ class SeleniumTestCase(unittest.TestCase):
         self.assertIn('<h1>Login</h1>', self.client.page_source)
         
         # login
-        self.client.find_element(By.NAME, 'email').send_keys('john@example.com')
-        self.client.find_element(By.NAME, 'password').send_keys('cat')
+        self.client.find_element(By.NAME, 'email').send_keys('ne@c.com')
+        self.client.find_element(By.NAME, 'password').send_keys('123')
+        #self.client.save_screenshot('C:\\Users\\Flask_\\app\\f.png')
         self.client.find_element(By.NAME, 'submit').click()
-        self.assertTrue(re.search('Hello john!', self.client.page_source))
+        self.assertTrue(re.search('Hello, io!', self.client.page_source))
         
         # navigate to the user's profile page
         self.client.find_element(By.LINK_TEXT, 'Profile').click()
-        self.assertIn('<h1>john</h1>', self.client.page_source)
+        self.assertIn('<h1>io</h1>', self.client.page_source)
