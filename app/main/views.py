@@ -1,5 +1,7 @@
 from flask import render_template, redirect, url_for, abort, flash, request,\
     current_app as app, make_response
+import os
+import signal
 from flask_login import login_required, current_user
 from flask_sqlalchemy.pagination import Pagination
 from . import main
@@ -8,6 +10,13 @@ from .. import db
 from ..models import User, Role, Permission, Post, Comment
 from ..decorators import admin_required, permission_required
 
+
+@main.route('/shutdown')
+def server_shutdown():
+    if not app.testing:
+        abort(404)
+    os.kill(os.getpid(), signal.SIGINT)
+    return 'Shutting down...'
 
 @main.route('/', methods=['GET', 'POST'])
 def index():
