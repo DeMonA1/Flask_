@@ -1,6 +1,9 @@
 from flask import render_template, redirect, url_for, abort, flash, request,\
     current_app as app, make_response
+import os
+import signal
 from flask_login import login_required, current_user
+from flask_sqlalchemy.record_queries import get_recorded_queries
 from flask_sqlalchemy.pagination import Pagination
 from . import main
 from .forms import EditProfileForm, EditProfileAdminForm, PostForm, CommentForm
@@ -8,6 +11,24 @@ from .. import db
 from ..models import User, Role, Permission, Post, Comment
 from ..decorators import admin_required, permission_required
 
+
+@main.after_app_request
+def after_request(response):
+    for query in get_recorded_queries():
+        if query.duration >= app.config['FLASKY_SLOW_DB_QUERY_TIME']:
+            app.logger.warning(
+                f'Slow query: {query.statement}\nParameters: {query.parameters}\n \
+                    Duration: {query.duration}\nContext: {query.location}\n'
+            )
+        return response
+
+
+@main.route('/shutdown')
+def server_shutdown():
+    if not app.testing:
+        abort(404)
+    os.kill(os.getpid(), signal.SIGINT)
+    return 'Shutting down...'
 
 @main.route('/', methods=['GET', 'POST'])
 def index():

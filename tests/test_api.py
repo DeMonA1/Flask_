@@ -145,6 +145,7 @@ class APITestCase(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         json_response = json.loads(response.get_data(as_text=True))
+        # without , _external=True with Post().to_json()[url]
         self.assertEqual('http://localhost' + json_response['url'], url)
         self.assertEqual(json_response['body'], 'body of the *blog* post')
         self.assertEqual(json_response['body_html'],
@@ -252,6 +253,7 @@ class APITestCase(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         json_response = json.loads(response.get_data(as_text=True))
+        # without _external=True in Comments().to_json()[url]
         self.assertEqual('http://localhost' + json_response['url'], url)
         self.assertEqual(json_response['body'],
                          'Good [post](http://example.com)!')

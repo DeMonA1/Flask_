@@ -243,13 +243,13 @@ class User(UserMixin, db.Model):
     
     def generate_auth_token(self):
         s = Serializer(app.config['SECRET_KEY'])
-        return s.dumps({'id': self.id}).encode('utf-8')
+        return s.dumps({'id': self.id})
     
     @staticmethod
     def verify_auth_token(token: bytes):
         s = Serializer(app.config['SECRET_KEY'])
         try:
-            data = s.loads(token.decode('utf-8'))
+            data = s.loads(token)
         except:
             return None
         return User.query.get(data['id'])
@@ -308,9 +308,9 @@ class Post(db.Model):
     
     def to_json(self):
         json_post = {
-            'url': url_for('api.get_post', id=self.id, _external=True),
+            'url': url_for('api.get_post', id=self.id),                         # without , _external=True with test_posts 
             'body': self.body,
-            'body.html': self.body_html,
+            'body_html': self.body_html,
             'timestamp': self.timestamp,
             'author': url_for('api.get_user', id=self.author_id, _external=True),
             'comments': url_for('api.get_post_comments', id=self.id, _external=True),
@@ -339,12 +339,12 @@ class Comment(db.Model):
 
     def to_json(self):
         json_comment = {
-            'url': url_for('api.get_comment', id=self.id),
-            'post_url': url_for('api.get_post', id=self.post_id),
+            'url': url_for('api.get_comment', id=self.id),              # without , _external=True with test_comments 
+            'post_url': url_for('api.get_post', id=self.post_id, _external=True),
             'body': self.body,
             'body_html': self.body_html,
             'timestamp': self.timestamp,
-            'author_id': url_for('api.get_user', id=self.author_id),
+            'author_id': url_for('api.get_user', id=self.author_id, _external=True),
         }
         return json_comment
     

@@ -4,7 +4,7 @@ from ..models import Post, Permission
 from . import api
 from .authentication import auth
 from .errors import forbidden
-from ..decorators import permission_required
+from .decorators import permission_required
 
 
 @api.route('/posts/')
