@@ -18,6 +18,7 @@ class Config:
     FLASKY_MAIL_SENDER = 'Flasky Admin <flasky@exmaple.com>'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_RECORD_QUERIES = True
+    SSL_REDIRECT = False
     FLASKY_SLOW_DB_QUERY_TIME = 0.5
     FLASKY_ADMIN = os.environ.get('FLASKY_ADMIN')
     FLASKY_POSTS_PER_PAGE = 20
@@ -80,7 +81,18 @@ class TestingWithSeleniumConfig(TestingConfig):
         if os.environ.get('FLASK_RUN_FROM_CLI'):
             os.environ.pop('FLASK_RUN_FROM_CLI')
 
+
+class UnixConfig(ProductionConfig):
+    @classmethod
+    def init_app(cls, app):
+        ProductionConfig.init_app(app)
         
+        # use syslog for logging
+        import logging
+        from logging.handlers import SysLogHandler
+        syslog_handler = SysLogHandler()
+        syslog_handler.setLevel(logging.WARNING)
+        app.logger.addHandler(syslog_handler)        
         
 config: Dict[str, Type[T]] = {
     'development': DevelopmentConfig,
@@ -88,4 +100,5 @@ config: Dict[str, Type[T]] = {
     'production': ProductionConfig,
     'default': DevelopmentConfig,
     'testing-with-selenium': TestingWithSeleniumConfig,
+    'unix': UnixConfig,
 }
