@@ -1,12 +1,4 @@
 # Flask_
-# bootstrap
-
-## Profiler 
-For profilieze code for each function. Execution speed of each fucntion.
-Len 25 is amount of most slow functions in output.
-
-## .env
-FLASK_COVERAGE and parameters form congig.py or default.
 
 ## Run
 ```bash
@@ -14,10 +6,10 @@ flask --app  manage.py test --coverage
 ```
 ## 🌟 Highlights
 
-- # Db
-- This
-- etc.
-
+### Run
+```bash
+flask --app  manage.py test --coverage
+```
 
 ## ℹ️ Overview
 
@@ -42,3 +34,5 @@ Warning! Webdriver for Chrome-browser should has actual version.
 For profilieze code for each function. Execution speed of each fucntion.
 Len 25 is amount of most slow functions in output.
 
+### .env
+FLASK_COVERAGE and parameters form congig.py or default.
