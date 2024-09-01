@@ -51,7 +51,7 @@ class ProductionConfig(Config):
         'sqlite:///' + os.path.join(basedir, 'data.sqlite')
     
     @classmethod
-    def init_app(cls, app):
+    def init_app(cls, app: Flask):
         Config.init_app(app)
         
         # send to administrators letters with errors messages    
@@ -84,7 +84,7 @@ class TestingWithSeleniumConfig(TestingConfig):
 
 class UnixConfig(ProductionConfig):
     @classmethod
-    def init_app(cls, app):
+    def init_app(cls, app: Flask):
         ProductionConfig.init_app(app)
         
         # use syslog for logging
