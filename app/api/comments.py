@@ -1,8 +1,10 @@
+from typing import List
 from flask import jsonify, request, g, url_for, current_app as app
 from .. import db
 from ..models import Post, Permission, Comment
 from . import api
 from .decorators import permission_required
+from flask_sqlalchemy.pagination import Pagination
 
 
 @api.route('/comments/')
@@ -11,7 +13,7 @@ def get_comments():
     pagination = Comment.query.order_by(Comment.timestamp.desc()).paginate(
         page=page, per_page=app.config['FLASKY_COMMENTS_PER_PAGE'],
         error_out=False)
-    comments = pagination.items
+    comments: List[Comment] = pagination.items
     prev = None
     if pagination.has_prev:
         prev = url_for('api.get_comments', page=page-1)
@@ -28,15 +30,15 @@ def get_comments():
 
 @api.route('/comments/<int:id>')
 def get_comment(id):
-    comment = Comment.query.get_or_404(id)
+    comment: Comment = Comment.query.get_or_404(id)
     return jsonify(comment.to_json())
 
 
 @api.route('/posts/<int:id>/comments/')
 def get_post_comments(id):
-    post = Post.query.get_or_404(id)
+    post: Post = Post.query.get_or_404(id)
     page = request.args.get('page', 1, type=int)
-    pagination = post.comments.order_by(Comment.timestamp.asc()).paginate(
+    pagination: Pagination = post.comments.order_by(Comment.timestamp.asc()).paginate(
         page=page, per_page=app.config['FLASKY_COMMENTS_PER_PAGE'],
         error_out=False)
     comments = pagination.items
@@ -58,7 +60,7 @@ def get_post_comments(id):
 @permission_required(Permission.COMMENT)
 def new_post_comment(id):
     post = Post.query.get_or_404(id)
-    comment = Comment.from_json(request.json)
+    comment: Comment = Comment.from_json(request.json)
     comment.author = g.current_user
     comment.post = post
     db.session.add(comment)
