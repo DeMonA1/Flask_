@@ -1,9 +1,5 @@
 # Flask_
 
-## Run
-```bash
-flask --app  manage.py test --coverage
-```
 ## 🌟 Highlights
 
 ### Run
@@ -13,7 +9,7 @@ flask --app  manage.py test --coverage
 
 ## ℹ️ Overview
 
-This is learning project based on Flask framework that perform simple blog webapp.
+This is a learning project based on the Flask framework, which is a simple web application for a blog.
 
 ## ⬇️ Installation
 
@@ -31,8 +27,8 @@ Warning! Webdriver for Chrome-browser should has actual version.
   $ flask db upgrade
 ```
 ### Profiler 
-For profilieze code for each function. Execution speed of each fucntion.
-Len 25 is amount of most slow functions in output.
+To get the profile code for each function according to their speed.
+Len 25 is the number of the slowest functions in the output.
 
 ### .env
-FLASK_COVERAGE and parameters form congig.py or default.
+The FLASK_COVERAGE value and parameters are specified in config.py or by default.
